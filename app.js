@@ -38,7 +38,7 @@ function fetchUserActivity(username) {
     });
 
     response.on('end', () => {
-      console.log(responseData);
+      handleResponse(response.statusCode, responseData, username);
     });
   });
 
@@ -48,6 +48,88 @@ function fetchUserActivity(username) {
   });
 
   request.end();
+}
+
+function handleResponse(statusCode, responseData, username) {
+  if (statusCode === 404) {
+    return console.log(`User "${username}" not found`);
+  }
+  if (statusCode !== 200) {
+    return console.log(`Error: ${statusCode}`);
+  }
+
+  try {
+    const events = JSON.parse(responseData);
+
+    if (events.length === 0) {
+      return console.log(`No recent public activity found for ${username}`);
+    }
+
+    console.log(`\nRecent activity for ${username}:`);
+    console.log('-'.repeat(50));
+
+    events.slice(0, 30).forEach((event, index) => {
+      const repo = event.repo.name;
+      const date = new Date(event.created_at).toLocaleDateString();
+      const eventNumber = index + 1;
+
+      switch (event.type) {
+        case 'PushEvent':
+          console.log(
+            `${eventNumber}. Pushed ${event.payload.size} commits to ${repo} on ${date}`
+          );
+          break;
+
+        case 'CreateEvent':
+          const refType = event.payload.ref_type;
+          const ref = event.payload.ref || event.repo.name.split('/')[1];
+          console.log(`${eventNumber}. Created ${refType} ${ref} on ${date}`);
+          break;
+
+        case 'WatchEvent':
+          console.log(`${eventNumber}. Starred ${repo} on ${date}`);
+          break;
+
+        case 'IssuesEvent':
+          console.log(
+            `${eventNumber}. ${event.payload.action} an issue in ${repo} on ${date}`
+          );
+          break;
+
+        case 'ForkEvent':
+          console.log(`${eventNumber}. Forked ${repo} on ${date}`);
+          break;
+
+        case 'PullRequestEvent':
+          console.log(
+            `${eventNumber}. ${event.payload.action} a pull request in ${repo} on ${date}`
+          );
+          break;
+
+        case 'DeleteEvent':
+          console.log(
+            `${eventNumber}. Deleted ${event.payload.ref_type} in ${repo} on ${date}`
+          );
+          break;
+
+        case 'ReleaseEvent':
+          console.log(
+            `${eventNumber}. Released ${event.payload.release.tag_name} in ${repo} on ${date}`
+          );
+          break;
+
+        default:
+          console.log(
+            `${eventNumber}. ${event.type.replace(
+              'Event',
+              ''
+            )} in ${repo} on ${date}`
+          );
+      }
+    });
+  } catch (error) {
+    console.error('Error parsing response:', error.message);
+  }
 }
 
 fetchUserActivity(username);
